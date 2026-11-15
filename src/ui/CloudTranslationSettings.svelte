@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { onMount, untrack } from 'svelte';
+  import { onDestroy, onMount, untrack } from 'svelte';
   import { browser } from 'wxt/browser';
   import { hasOpenAIKey, OPENAI_ORIGIN, saveOpenAIKey } from '@/engine/openai/credentials';
   import type { Settings, SettingsPatch } from '@/shared/settings';
@@ -19,6 +19,10 @@
       .catch(() => {
         message = 'キーの状態を確認できません。';
       });
+  });
+
+  onDestroy(() => {
+    key = '';
   });
 
   async function enable() {
@@ -48,6 +52,7 @@
     } catch {
       message = '設定できませんでした。もう一度お試しください。';
     } finally {
+      key = '';
       busy = false;
     }
   }
@@ -99,6 +104,15 @@
       >送信・課金を理解してOpenAIを有効化</button
     >
     <button type="button" disabled={busy || !present} onclick={clear}>キーを削除</button>
+  </details>
+  <details>
+    <summary>Microsoft 365 Copilot（実験版・別画面）</summary>
+    <p>
+      Copilot追加ライセンスとEntraアプリ登録が必要です。組織情報がWebサイトへ漏れるのを防ぐため、ページ内翻訳には使わず、専用画面へ文章を貼り付けて翻訳します。
+    </p>
+    <a href={browser.runtime.getURL('/copilot.html')} target="_blank" rel="noopener noreferrer"
+      >Copilot翻訳画面を開く</a
+    >
   </details>
   {#if message}<p role="status">{message}</p>{/if}
 </fieldset>

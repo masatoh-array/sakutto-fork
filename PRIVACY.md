@@ -3,7 +3,7 @@
 ## Personal BYOK fork addendum (2026-11-15)
 
 This addendum applies to this personal fork. The upstream policy preserved below describes
-**local mode**, not the optional OpenAI mode. Enabling OpenAI sends translation text, surrounding
+**local mode**, not the optional OpenAI or isolated Copilot modes. Enabling OpenAI sends translation text, surrounding
 context, and matching glossary entries directly to `https://api.openai.com/v1/responses`.
 This also applies to sites already configured for automatic translation. OpenAI receives your
 API authorization and network metadata such as your IP address. Translation requests use
@@ -16,6 +16,14 @@ extension clears it. The settings page can delete the key; deletion does not rev
 and does not switch providers automatically. Switch back to local mode explicitly to stop future
 cloud translation requests. OpenAI mode bypasses the local translation cache. Do not use it for
 confidential pages without authorization. API charges are separate from ChatGPT subscription fees.
+
+The experimental Copilot screen sends manually pasted text to Microsoft Graph after sign-in and
+explicit consent. It requires broad delegated permissions for work content. Enterprise grounding
+may return organizational information; results are plain text in an isolated extension page and
+are never injected into a website. Web grounding is disabled per request. Tokens and text stay in
+that page's memory only; Microsoft may retain conversations under its policies. Closing the page
+or disconnecting does not revoke consent or delete Microsoft's history. See [Copilot setup and
+security boundaries](docs/COPILOT.md) and [credential security](docs/SECURITY-BYOK.md).
 
 Last updated: 2026-11-08
 
@@ -92,7 +100,7 @@ Questions about this policy can be opened as an issue at https://github.com/jamm
 ## 個人用 BYOK fork の追記（2026-11-15）
 
 この追記は個人用 fork のものです。以下に残した本家のポリシーは**ローカル方式**に適用され、
-任意の OpenAI 方式には適用されません。OpenAI を有効化すると、翻訳対象の文字・周辺文脈・
+任意の OpenAI 方式や隔離されたCopilot画面には適用されません。OpenAI を有効化すると、翻訳対象の文字・周辺文脈・
 該当する用語集を `https://api.openai.com/v1/responses` に直接送ります。既に自動翻訳を設定した
 サイトも対象です。OpenAI は API 認証情報と IP アドレスなどの通信情報も受け取ります。
 `store: false` を指定しますが、サービス側の保存が一切ないことを保証するものではありません。
@@ -104,6 +112,12 @@ OpenAI による取り扱いには同社の適用される規約・ポリシー�
 設定からキーを削除できますが、OpenAI 側での失効やローカル方式への切替は別操作です。
 今後のクラウド翻訳を止めるには明示的にローカルへ戻してください。OpenAI 方式はローカル翻訳
 キャッシュを使いません。許可のない機密ページで使用しないでください。API 料金は ChatGPT の月額料金とは別です。
+
+Copilot実験版は、明示的な同意とサインイン後、手動で貼り付けた文章をMicrosoft Graphへ送ります。
+職場の情報に対する広い委任アクセス許可が必要です。組織内検索により組織情報を含む回答が返る可能性があるため、
+結果は隔離した拡張機能画面のプレーンテキスト表示に限定し、Webサイトへ戻しません。Web検索は要求ごとに無効化します。
+トークンと文章は画面のメモリだけに保持しますが、Microsoft側で会話が保存される可能性があります。
+画面を閉じる・接続解除は、Microsoft側の同意や履歴を削除しません。[設定と安全上の制約](docs/COPILOT.md)を参照してください。
 
 最終更新: 2026-11-08
 

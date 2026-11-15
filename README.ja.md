@@ -6,6 +6,8 @@
 > キーはブラウザセッション限定で保存し、端末間同期やページ側への公開は行いません。
 > [設定・開発メモ](docs/BYOK.md)と[この fork のプライバシー追記](PRIVACY.md)を参照してください。
 > 以下の Chrome ウェブストアのリンクは本家用で、**この改造版はインストールされません**。
+> [Microsoft 365 Copilot実験版](docs/COPILOT.md)は、専用画面に貼り付けた文章だけを翻訳します。
+> 元ページには結果を戻しません。Entra登録・Copilot追加ライセンス・広い権限が必要で、実認証は未検証です。
 
 Sakutto は、ウェブページを端末の中で翻訳する非公式の Chrome 拡張機能です。翻訳には [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF) を使い、実行にはピン留めした [wllama](https://github.com/ngxson/wllama) を使います。訳文はすべて PLaMo が生成します。モデルの準備を待つあいだも、ページには Chrome 内蔵翻訳の下書きを挟まず、原文のまま表示します。Chrome の Translator API を使うのは、PLaMo が対応していない言語の組み合わせだけです。Preferred Networks, Inc. とは無関係です。Built with PLaMo。
 

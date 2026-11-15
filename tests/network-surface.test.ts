@@ -3,8 +3,8 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Local translation only downloads the pinned model. This fork adds one explicit cloud
- * exception: OpenAI translation after the user enables it. Keep that exception narrow;
+ * Local translation only downloads the pinned model. This fork adds explicit cloud
+ * exceptions: OpenAI translation and isolated Copilot translation after user consent. Keep that exception narrow;
  * no other runtime file may introduce analytics or another outbound transport.
  *
  * The model download still must not carry a body or credentials. The separate OpenAI
@@ -136,7 +136,7 @@ const NETWORK_SINKS = [
 ];
 
 describe('network surface', () => {
-  it('keeps network sinks in the model download and explicit OpenAI backend', () => {
+  it('keeps network sinks in the model download and explicit cloud clients', () => {
     const reaching = files.filter(
       (file) =>
         /\bfetch\w*\s*\(/u.test(file.code) ||
@@ -144,6 +144,7 @@ describe('network surface', () => {
     );
 
     expect(reaching.map((file) => file.path)).toEqual([
+      'src/engine/copilot/client.ts',
       'src/engine/model/download.ts',
       'src/engine/openai/engine.ts',
     ]);

@@ -143,3 +143,9 @@ describe('OpenAI translation', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 });
+
+it('keeps the key out of object serialization and enumerable properties', () => {
+  const engine = new OpenAIEngine('test-key-not-real', 'test-model');
+  expect(JSON.stringify(engine)).not.toContain('test-key-not-real');
+  expect(Object.values({ ...engine })).not.toContain('test-key-not-real');
+});

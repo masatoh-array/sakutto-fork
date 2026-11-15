@@ -6,6 +6,9 @@
 > glossary entries to OpenAI and incurs separate API charges. Keys are stored only for the
 > browser session, not synced or exposed to page scripts. See [BYOK setup and development
 > notes](docs/BYOK.md) and the [fork privacy addendum](PRIVACY.md).
+> An experimental [Microsoft 365 Copilot screen](docs/COPILOT.md) translates pasted text in an
+> isolated extension page, not in the source website. It requires Entra app registration, a
+> Copilot add-on license and broad delegated permissions. Live sign-in is not yet verified.
 > The Chrome Web Store link below installs upstream Sakutto, **not this modified fork**.
 
 Sakutto is an unofficial Chrome extension that translates web pages on your device. It runs [PLaMo 3 Translate](https://huggingface.co/pfnet/plamo-3-translate-0.8b-GGUF) through a pinned [wllama](https://github.com/ngxson/wllama) build. Every translated line is written by PLaMo: a page waiting for the model keeps its source text rather than showing a draft from another engine. Chrome's Translator API is used only for the language pairs PLaMo does not support. Not affiliated with Preferred Networks, Inc. Built with PLaMo.

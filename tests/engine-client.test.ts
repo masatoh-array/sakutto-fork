@@ -15,7 +15,10 @@ vi.mock('wxt/browser', () => ({
     runtime: { id: 'test-extension', connect: vi.fn() },
     storage: {
       local: { get: cloudMocks.localGet },
-      session: { get: vi.fn(async () => ({ openaiApiKey: 'test-key-not-real' })) },
+      session: {
+        get: vi.fn(async () => ({ openaiApiKey: 'test-key-not-real' })),
+        setAccessLevel: vi.fn(async () => undefined),
+      },
       onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
     },
     permissions: { contains: cloudMocks.contains },

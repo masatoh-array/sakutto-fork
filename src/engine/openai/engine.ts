@@ -11,16 +11,20 @@ export const OPENAI_RESPONSES_URL = 'https://api.openai.com/v1/responses';
 /** One segment per call avoids alignment guesses. No automatic retry or provider fallback. */
 export class OpenAIEngine implements IdentifiedEngine {
   readonly kind = 'openai' as const;
+  // A runtime-private field cannot be exposed by object spread / JSON serialization.
+  readonly #apiKey: string;
   constructor(
-    private readonly apiKey: string,
+    apiKey: string,
     private readonly model: string,
-  ) {}
+  ) {
+    this.#apiKey = apiKey;
+  }
 
   async *translate(
     segments: readonly TranslateSegment[],
     options: TranslateOptions,
   ): AsyncIterable<TranslationChunk> {
-    if (!this.apiKey.trim())
+    if (!this.#apiKey.trim())
       throw new EngineError(
         'invalid-input',
         'OpenAI API key is missing. Enter it in extension settings after restarting the browser.',
@@ -40,7 +44,7 @@ export class OpenAIEngine implements IdentifiedEngine {
       try {
         const response = await fetch(OPENAI_RESPONSES_URL, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.#apiKey}` },
           credentials: 'omit',
           redirect: 'error',
           cache: 'no-store',

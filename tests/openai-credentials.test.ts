@@ -44,3 +44,25 @@ describe('OpenAI credential storage', () => {
     expect(await readOpenAIKey()).toBe('');
   });
 });
+
+it('establishes trusted access before reading and fails closed when it is unavailable', async () => {
+  vi.mocked(browser.storage.session.setAccessLevel).mockRejectedValueOnce(new Error('unavailable'));
+  await expect(readOpenAIKey()).rejects.toThrow('unavailable');
+  expect(browser.storage.session.get).not.toHaveBeenCalled();
+});
+
+it('does not persist credentials when the trusted boundary cannot be established', async () => {
+  vi.mocked(browser.storage.session.setAccessLevel).mockRejectedValueOnce(new Error('unavailable'));
+  await expect(saveOpenAIKey('test-key-not-real')).rejects.toThrow('unavailable');
+  expect(browser.storage.session.set).not.toHaveBeenCalled();
+});
+
+it.each(['test\nkey', 'test key', 'test\u0000key', 'x'.repeat(1025)])(
+  'rejects malformed keys without echoing their value',
+  async (key) => {
+    await expect(saveOpenAIKey(key)).rejects.toThrow('Invalid API key format.');
+    expect(browser.storage.session.set).not.toHaveBeenCalled();
+    state.values.openaiApiKey = key;
+    expect(await readOpenAIKey()).toBe('');
+  },
+);

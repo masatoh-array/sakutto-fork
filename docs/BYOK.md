@@ -67,7 +67,7 @@ state/nonce 検証、トークン管理を必要とする。
 [登録とサインイン](https://developers.openai.com/siwc/token-sharing-open-source/sign-in) /
 [公式 Electron 実装例](https://developers.openai.com/cookbook/articles/sign-in-with-chatgpt)
 
-### Microsoft 365 Copilot: 未実装
+### Microsoft 365 Copilot: 隔離画面の実験版を実装
 
 Copilot Chat API はプレビューで提供されるが、通常の Microsoft 365 契約だけでは足りず、
 Microsoft 365 Copilot の追加ライセンスが必要。個人 Microsoft アカウントではなく、
@@ -76,7 +76,11 @@ Microsoft 365 Copilot の追加ライセンスが必要。個人 Microsoft ア�
 翻訳だけに対して広い Graph 権限を要求する点が導入判断になる。現行の chat エンドポイントは
 `Sites.Read.All`、`Mail.Read`、`People.Read.All`、`OnlineMeetingTranscript.Read.All`、
 `Chat.Read`、`ChannelMessage.Read.All`、`ExternalItem.Read.All` を要求している。
-ライセンス・権限の確認なしに、サインインすれば使える選択肢として表示しない。
+ライセンス・権限不足はエラーで案内するが、403だけで原因を断定しない。
+
+[Copilot専用画面](COPILOT.md)は手動貼り付け・プレーンテキスト出力だけを扱う。
+組織内検索から得た情報がWebサイトに漏れる危険を避けるため、ページ翻訳ルートには接続しない。
+実際のアカウントによるサインインと翻訳は未検証。Entraアプリ登録と利用者自身の同意操作が必要。
 
 [概要とライセンス](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/api/ai-services/chat/overview) /
 [chat エンドポイントと必要権限](https://learn.microsoft.com/en-us/microsoft-365/copilot/extensibility/api/ai-services/chat/copilotconversation-chat)
@@ -108,5 +112,11 @@ Microsoft 365 Copilot の追加ライセンスが必要。個人 Microsoft ア�
 - 実ブラウザ検証: 未完了。テスト用 Chromium のダウンロードに問題があり、システム Chromium も
   ローカルソケットの権限制約により起動できなかった。
 - 秘密情報: 変更ファイルのパターン検査を実施。実キーは取得・使用していない。
-- ChatGPT / Microsoft 365 サインイン: 未実装。
+- ChatGPT サインイン: 未実装。Microsoft 365 Copilotサインイン: 隔離画面に実験実装、実認証未検証。
 - 実 API キーを使った翻訳: 未検証。
+
+## 追記: セキュリティ強化とCopilot
+
+キーの信頼境界・保持制限は [SECURITY-BYOK.md](SECURITY-BYOK.md)、Copilotの設定と検証範囲は [COPILOT.md](COPILOT.md) を参照。上の629件の結果は初回実装時の記録で、追加変更の結果は以下に追記する。
+
+追加変更後: 単体テスト **659件中657件成功、2件は上記の既存失敗**。型チェックはエラー・警告0、lintとモックビルドは成功。Copilot単体テスト23件は成功。実ブラウザ・実認証・実API通信・正式wllamaビルドは未検証／未完了のまま。
