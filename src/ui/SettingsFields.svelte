@@ -1,6 +1,7 @@
 <script lang="ts">
   import { t } from '@/shared/i18n';
   import type { Settings, SettingsPatch } from '@/shared/settings';
+  import CloudTranslationSettings from './CloudTranslationSettings.svelte';
   import LanguageField from './LanguageField.svelte';
 
   interface Props {
@@ -28,6 +29,7 @@
 </script>
 
 <div class="fields">
+  <CloudTranslationSettings {settings} {onChange} />
   <LanguageField
     value={settings.targetLanguage}
     {uiLanguage}

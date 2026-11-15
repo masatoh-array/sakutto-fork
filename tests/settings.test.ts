@@ -25,6 +25,8 @@ function stored(overrides: Partial<Settings> = {}): Settings {
     idleMinutes: 5,
     tier: 'auto',
     pace: 'quality',
+    translationProvider: 'local',
+    openaiModel: 'gpt-4.1-mini',
     ...overrides,
   };
 }

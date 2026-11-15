@@ -1,5 +1,22 @@
 # Privacy policy
 
+## Personal BYOK fork addendum (2026-11-15)
+
+This addendum applies to this personal fork. The upstream policy preserved below describes
+**local mode**, not the optional OpenAI mode. Enabling OpenAI sends translation text, surrounding
+context, and matching glossary entries directly to `https://api.openai.com/v1/responses`.
+This also applies to sites already configured for automatic translation. OpenAI receives your
+API authorization and network metadata such as your IP address. Translation requests use
+`store: false`; this is not a promise of zero retention by the service. OpenAI's applicable
+service policies govern its handling of the requests. The fork adds no developer relay or telemetry.
+
+The API key is held in trusted-context-only browser session storage. It is not placed in ordinary
+settings or synchronized storage, or sent to page scripts. Restarting the browser or reloading the
+extension clears it. The settings page can delete the key; deletion does not revoke it at OpenAI
+and does not switch providers automatically. Switch back to local mode explicitly to stop future
+cloud translation requests. OpenAI mode bypasses the local translation cache. Do not use it for
+confidential pages without authorization. API charges are separate from ChatGPT subscription fees.
+
 Last updated: 2026-11-08
 
 Sakutto is an unofficial Chrome extension that translates web pages on your device. This page describes what the extension does with data in plain terms. It describes the kinds of data involved and who can see them, not the internals of the implementation.
@@ -71,6 +88,22 @@ The extension has a single purpose: translating web pages. The text it reads, yo
 Questions about this policy can be opened as an issue at https://github.com/jammaru/sakutto/issues. The source code is at https://github.com/jammaru/sakutto, and the Chrome Web Store listing is at https://chrome.google.com/webstore/detail/mhlbjjijfkoghmcjndgdimhdlfkhadfl.
 
 # プライバシーポリシー
+
+## 個人用 BYOK fork の追記（2026-11-15）
+
+この追記は個人用 fork のものです。以下に残した本家のポリシーは**ローカル方式**に適用され、
+任意の OpenAI 方式には適用されません。OpenAI を有効化すると、翻訳対象の文字・周辺文脈・
+該当する用語集を `https://api.openai.com/v1/responses` に直接送ります。既に自動翻訳を設定した
+サイトも対象です。OpenAI は API 認証情報と IP アドレスなどの通信情報も受け取ります。
+`store: false` を指定しますが、サービス側の保存が一切ないことを保証するものではありません。
+OpenAI による取り扱いには同社の適用される規約・ポリシーが適用されます。開発者の中継サーバーや
+テレメトリは追加していません。
+
+キーは信頼された拡張機能コンテキストだけが読めるセッションストレージに保存し、通常の設定・
+同期ストレージ・ページ側には渡しません。ブラウザ再起動・拡張機能再読み込みで消えます。
+設定からキーを削除できますが、OpenAI 側での失効やローカル方式への切替は別操作です。
+今後のクラウド翻訳を止めるには明示的にローカルへ戻してください。OpenAI 方式はローカル翻訳
+キャッシュを使いません。許可のない機密ページで使用しないでください。API 料金は ChatGPT の月額料金とは別です。
 
 最終更新: 2026-11-08
 

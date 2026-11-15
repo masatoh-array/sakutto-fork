@@ -190,7 +190,7 @@ export default defineBackground(() => {
     if (warmStarted) return;
     warmStarted = true;
     const settings = await ensureSettings();
-    if (!hasLicenseConsent(settings)) return;
+    if (settings.translationProvider === 'openai' || !hasLicenseConsent(settings)) return;
     const status = await client.modelStatus(DEFAULT_MODEL_ID).catch(() => null);
     if (!status || (status.state !== 'ready' && status.state !== 'loaded')) return;
     const warmed = await client.warmModel().catch(() => null);
@@ -256,17 +256,26 @@ export default defineBackground(() => {
     }
 
     if (isEngineWarmRequest(message)) {
-      void client.warmModel().then(
-        (status) => {
-          if (status) void broadcast({ type: 'model:progress', status });
-          sendResponse(true);
-          // A page translated in the same moment should get the runtime before this sample.
-          setTimeout(() => {
-            void measureQuality(client);
-          }, 15_000);
-        },
-        () => sendResponse(false),
-      );
+      void ensureSettings()
+        .then(async (settings) =>
+          settings.translationProvider === 'openai' ? null : client.warmModel(),
+        )
+        .then(
+          (status) => {
+            if (status) void broadcast({ type: 'model:progress', status });
+            sendResponse(true);
+            // A page translated in the same moment should get the runtime before this sample.
+            if (status)
+              setTimeout(() => {
+                void ensureSettings()
+                  .then((current) =>
+                    current.translationProvider === 'openai' ? null : measureQuality(client),
+                  )
+                  .catch(() => undefined);
+              }, 15_000);
+          },
+          () => sendResponse(false),
+        );
       return true;
     }
 
@@ -292,7 +301,11 @@ export default defineBackground(() => {
     }
 
     if (isQualitySampleRequest(message)) {
-      void measureQuality(client).then(sendResponse, () => sendResponse(null));
+      void ensureSettings()
+        .then((settings) =>
+          settings.translationProvider === 'openai' ? null : measureQuality(client),
+        )
+        .then(sendResponse, () => sendResponse(null));
       return true;
     }
 

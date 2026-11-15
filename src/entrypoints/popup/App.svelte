@@ -68,11 +68,13 @@
    * rather than locking it on a guess.
    */
   let canStart = $derived(
-    translated ||
+    settings?.translationProvider === 'openai' ||
+      translated ||
       isChromeOnlyLanguage(targetLanguage) ||
       !modelStartBlocked(engine?.model ?? modelMark),
   );
   let engineText = $derived.by(() => {
+    if (settings?.translationProvider === 'openai') return `OpenAI API · ${settings.openaiModel}`;
     const label = runtimeLabel({
       status: engine,
       pageSimple: view?.active === true && view.engine === 'chrome',
@@ -82,6 +84,7 @@
   });
   let offer = $derived(
     settings !== null &&
+      settings.translationProvider !== 'openai' &&
       shouldSuggestHighQuality({
         tier: engine?.tier ?? null,
         paragraphMs: quality?.milliseconds ?? null,
@@ -305,7 +308,7 @@
   {/if}
 
   <p class="engine" aria-live="polite">{engineText}</p>
-  {#if engine}
+  {#if engine && settings?.translationProvider !== 'openai'}
     <p class="muted">
       {(engine.backend === 'webgpu'
         ? t('diagBackendGpu')

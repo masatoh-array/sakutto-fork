@@ -68,6 +68,7 @@
     shouldHintBuiltInFallback(engine?.tier ?? null, quality?.milliseconds ?? null),
   );
   let engineLine = $derived.by(() => {
+    if (settings?.translationProvider === 'openai') return `OpenAI API · ${settings.openaiModel}`;
     const label = runtimeLabel({
       status: engine,
       pageSimple: false,
@@ -394,8 +395,15 @@
 
   <section class="panel">
     <h2>{t('privacyHeading')}</h2>
-    <p>{t('privacyBody')}</p>
-    <p class="muted">{t('privacyDestinations')}</p>
+    {#if settings?.translationProvider === 'openai'}
+      <p>
+        OpenAI APIを利用中です。翻訳対象の文章・周辺文脈・関連する用語集は api.openai.com
+        に送信され、API利用料が発生します。ローカル翻訳のプライバシー説明はこのモードには適用されません。
+      </p>
+    {:else}
+      <p>{t('privacyBody')}</p>
+      <p class="muted">{t('privacyDestinations')}</p>
+    {/if}
     <ul class="links">
       <li>
         <a href={projectLinks.privacy} target="_blank" rel="noreferrer">{t('privacyPolicyLink')}</a>

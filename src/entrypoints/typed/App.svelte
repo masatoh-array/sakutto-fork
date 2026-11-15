@@ -50,13 +50,17 @@
   let trimmed = $derived(normalizeTypedInput(sourceText));
   let tooLong = $derived(trimmed.length > MAX_TYPED_CHARS);
   let readiness = $derived<TypedReadiness>(
-    typedReadiness({
-      consent: hasLicenseConsent(settings),
-      modelState: engineStatus?.model.state ?? 'absent',
-      plamoReady: engineStatus?.plamoReady ?? false,
-    }),
+    settings?.translationProvider === 'openai'
+      ? 'ready'
+      : typedReadiness({
+          consent: hasLicenseConsent(settings),
+          modelState: engineStatus?.model.state ?? 'absent',
+          plamoReady: engineStatus?.plamoReady ?? false,
+        }),
   );
-  let chromeOnlyTarget = $derived(isChromeOnlyLanguage(targetLanguage));
+  let chromeOnlyTarget = $derived(
+    settings?.translationProvider !== 'openai' && isChromeOnlyLanguage(targetLanguage),
+  );
   let canTranslate = $derived(
     !translating && trimmed.length > 0 && !tooLong && !chromeOnlyTarget && readiness === 'ready',
   );
@@ -241,7 +245,11 @@
     <img src="/icon/48.png" alt="" width="40" height="40" />
     <div>
       <h1>{t('extensionName')}</h1>
-      <p class="muted lead">{t('typedLead')}</p>
+      <p class="muted lead">
+        {settings?.translationProvider === 'openai'
+          ? 'OpenAI APIで翻訳します。入力内容はOpenAIに送信され、API利用料が発生します。'
+          : t('typedLead')}
+      </p>
     </div>
   </header>
 
@@ -366,7 +374,9 @@
     <button class="link-button" type="button" onclick={openOptions}>{t('openOptions')}</button>
     <p class="notice">{t('machineTranslationNotice')}</p>
     <p class="notice">{t('unofficialNotice')}</p>
-    <p class="notice">{t('typedChromeOnlyNote', [chromeOnlyNames.join(t('listSeparator'))])}</p>
+    {#if settings?.translationProvider !== 'openai'}<p class="notice">
+        {t('typedChromeOnlyNote', [chromeOnlyNames.join(t('listSeparator'))])}
+      </p>{/if}
   </footer>
 </main>
 

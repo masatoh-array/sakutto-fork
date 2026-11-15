@@ -59,6 +59,8 @@ export interface Settings {
   idleMinutes: IdleMinutes;
   tier: TierPreference;
   pace: TranslationPace;
+  translationProvider: 'local' | 'openai';
+  openaiModel: string;
 }
 
 export type SettingsPatch = Partial<
@@ -73,6 +75,8 @@ export type SettingsPatch = Partial<
     | 'idleMinutes'
     | 'tier'
     | 'pace'
+    | 'translationProvider'
+    | 'openaiModel'
   >
 >;
 
@@ -87,6 +91,8 @@ export const DEFAULT_SETTINGS: Readonly<Settings> = Object.freeze({
   idleMinutes: 5,
   tier: 'auto',
   pace: 'quality',
+  translationProvider: 'local',
+  openaiModel: 'gpt-4.1-mini',
 });
 
 export function createDefaultSettings(uiLanguage: string): Settings {
@@ -126,6 +132,12 @@ export function normalizeSettings(value: unknown, uiLanguage: string): Settings 
     idleMinutes: isIdleMinutes(value.idleMinutes) ? value.idleMinutes : defaults.idleMinutes,
     tier: isTierPreference(value.tier) ? value.tier : defaults.tier,
     pace: isTranslationPace(value.pace) ? value.pace : defaults.pace,
+    translationProvider: value.translationProvider === 'openai' ? 'openai' : 'local',
+    openaiModel:
+      typeof value.openaiModel === 'string' &&
+      /^[a-zA-Z0-9._:-]{1,100}$/.test(value.openaiModel.trim())
+        ? value.openaiModel.trim()
+        : defaults.openaiModel,
   };
 }
 

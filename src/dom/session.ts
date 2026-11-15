@@ -98,6 +98,8 @@ export interface SessionPreferences {
   tier: 'g' | 'c8' | 'c4' | null;
   pace: TranslationPace;
   glossary?: readonly GlossaryEntry[];
+  /** Non-secret provider/model identity, used to invalidate translations and avoid paid retries. */
+  providerKey?: string;
 }
 
 export interface PageViewState {
@@ -190,6 +192,7 @@ export function preferencesFor(
     context: false,
     tier: null,
     pace: settings.pace,
+    providerKey: `${settings.translationProvider}:${settings.openaiModel}`,
     ...(glossary.length > 0 ? { glossary } : {}),
   };
 }
@@ -418,6 +421,7 @@ export class PageSession {
     if (next.display !== previous.display) this.repaintAll();
     if (next.auto !== previous.auto && this.active) this.publishState();
     const languageChanged =
+      next.providerKey !== previous.providerKey ||
       next.targetLanguage !== previous.targetLanguage ||
       next.form !== previous.form ||
       glossaryKey(next.glossary) !== glossaryKey(previous.glossary);
@@ -440,7 +444,8 @@ export class PageSession {
     // stand-in for a warming model. Until something has painted, the engine is still null.
     let engine: EngineKind | null = null;
     if (this.active) {
-      if (lives.some((item) => item.engine === 'plamo')) engine = 'plamo';
+      if (lives.some((item) => item.engine === 'openai')) engine = 'openai';
+      else if (lives.some((item) => item.engine === 'plamo')) engine = 'plamo';
       else if (lives.some((item) => item.engine === 'chrome')) engine = 'chrome';
     }
     const pageLanguage = this.sourceLanguage();
@@ -1200,7 +1205,11 @@ export class PageSession {
           this.complete(item);
           continue;
         }
-        if (item.role === 'page' && item.failures < MAX_PAGE_FAILURES) {
+        if (
+          !this.prefs.providerKey?.startsWith('openai:') &&
+          item.role === 'page' &&
+          item.failures < MAX_PAGE_FAILURES
+        ) {
           item.failures += 1;
           // Retry alone. A packed request that failed may have done so because of one of
           // its neighbours, so packing the same group again would fail the same way and
@@ -1294,7 +1303,7 @@ export class PageSession {
     }
     const verdict = assessTranslation(output, placeholderIds(item.model));
     if (verdict.ok) return verdict.text;
-    if (item.attempts < 1) {
+    if (item.engine !== 'openai' && item.attempts < 1) {
       item.attempts += 1;
       item.flatten = true;
       item.partText = [];

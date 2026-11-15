@@ -493,7 +493,12 @@ export class PageOverlay {
     point?: { x: number; y: number },
   ): void {
     this.tipBody.textContent = original;
-    this.tipNote.textContent = engine === 'chrome' ? this.labels.chromeNote : this.labels.machine;
+    this.tipNote.textContent =
+      engine === 'openai'
+        ? 'OpenAI API'
+        : engine === 'chrome'
+          ? this.labels.chromeNote
+          : this.labels.machine;
     const rect = point ? new DOMRect(point.x, point.y, 0, 0) : anchor.getBoundingClientRect();
     this.place(this.tipHost, rect, false);
   }
@@ -525,9 +530,11 @@ export class PageOverlay {
     this.popBody.lang = lang ?? '';
     this.popNote.textContent = pending
       ? ''
-      : engine === 'chrome'
-        ? this.labels.chromeNote
-        : this.labels.machine;
+      : engine === 'openai'
+        ? 'OpenAI API'
+        : engine === 'chrome'
+          ? this.labels.chromeNote
+          : this.labels.machine;
     this.place(this.popHost, anchor, true);
     if (!opening) return;
     const active = this.doc.activeElement;

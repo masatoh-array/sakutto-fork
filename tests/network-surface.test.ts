@@ -3,13 +3,12 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 /**
- * The extension's privacy claim is structural: one request, for the pinned model file, and
- * nothing that could carry page text. That claim is easy to keep by hand and easy to lose
- * by accident — one analytics import, one `sendBeacon` in an error path — so it is checked
- * here instead of being trusted to review.
+ * Local translation only downloads the pinned model. This fork adds one explicit cloud
+ * exception: OpenAI translation after the user enables it. Keep that exception narrow;
+ * no other runtime file may introduce analytics or another outbound transport.
  *
- * `download.ts` is the only file allowed to reach the network, and the request it builds
- * may not grow a body or credentials.
+ * The model download still must not carry a body or credentials. The separate OpenAI
+ * engine tests check its fixed destination, credential handling and request body.
  */
 
 /** Resolved from this file, so the check reads the repository even from another directory. */
@@ -137,14 +136,17 @@ const NETWORK_SINKS = [
 ];
 
 describe('network surface', () => {
-  it('keeps every network sink in the model download', () => {
+  it('keeps network sinks in the model download and explicit OpenAI backend', () => {
     const reaching = files.filter(
       (file) =>
         /\bfetch\w*\s*\(/u.test(file.code) ||
         NETWORK_SINKS.some((pattern) => pattern.test(file.code)),
     );
 
-    expect(reaching.map((file) => file.path)).toEqual(['src/engine/model/download.ts']);
+    expect(reaching.map((file) => file.path)).toEqual([
+      'src/engine/model/download.ts',
+      'src/engine/openai/engine.ts',
+    ]);
   });
 
   it('sends no body and no credentials with the model request', () => {

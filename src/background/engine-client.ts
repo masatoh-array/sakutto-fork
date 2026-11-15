@@ -29,6 +29,9 @@ import {
   type ModelStatus,
 } from '@/shared/engine-status';
 import type { TierPreference } from '@/shared/settings';
+import { loadSettings } from '@/shared/storage';
+import { OpenAIEngine } from '@/engine/openai/engine';
+import { OPENAI_ORIGIN, readOpenAIKey } from '@/engine/openai/credentials';
 import type { OffscreenController } from './offscreen-lifecycle';
 
 type RequestWithoutId =
@@ -196,6 +199,50 @@ export class EngineClient {
     segments: readonly TranslateSegment[],
     options: TranslateOptions,
   ): AsyncGenerator<TranslationChunk> {
+    if (options.signal.aborted || segments.length === 0) return;
+    const settings = await loadSettings();
+    if (settings.translationProvider === 'openai') {
+      if (!(await browser.permissions.contains({ origins: [OPENAI_ORIGIN] }))) {
+        throw new EngineError('invalid-input', 'Enable OpenAI access in extension settings.', {
+          retryable: false,
+        });
+      }
+      const controller = new AbortController();
+      const cancel = () => controller.abort();
+      const changed = (changes: Record<string, { newValue?: unknown }>, area: string) => {
+        if (area === 'session' && changes.openaiApiKey) cancel();
+        if (area === 'local' && changes.settings) {
+          const next = changes.settings.newValue;
+          if (
+            typeof next !== 'object' ||
+            next === null ||
+            !('translationProvider' in next) ||
+            next.translationProvider !== 'openai' ||
+            !('openaiModel' in next) ||
+            next.openaiModel !== settings.openaiModel
+          )
+            cancel();
+        }
+      };
+      options.signal.addEventListener('abort', cancel, { once: true });
+      browser.storage.onChanged.addListener(changed);
+      try {
+        // Recheck after subscribing: a provider change during the permission await must not send.
+        const current = await loadSettings();
+        if (
+          current.translationProvider !== 'openai' ||
+          current.openaiModel !== settings.openaiModel
+        )
+          return;
+        const engine = new OpenAIEngine(await readOpenAIKey(), settings.openaiModel);
+        if (options.signal.aborted) cancel();
+        yield* engine.translate(segments, { ...options, signal: controller.signal });
+      } finally {
+        options.signal.removeEventListener('abort', cancel);
+        browser.storage.onChanged.removeListener(changed);
+      }
+      return;
+    }
     const requestId = createRequestId();
     const stream = new ChunkStream<TranslationChunk>();
     this.streams.set(requestId, stream);

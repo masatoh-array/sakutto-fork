@@ -2705,3 +2705,44 @@ describe('coverage reporting does not over-report', () => {
     expect(document.documentElement.dataset.sakuttoState).toBe('translated');
   });
 });
+
+describe('cloud translation retry policy', () => {
+  it('does not automatically retry a failed OpenAI page request', async () => {
+    document.documentElement.lang = 'en';
+    document.body.innerHTML = '<p id="cloud-failed">Hello world.</p>';
+    let calls = 0;
+    const session = start(
+      document,
+      engineOf(async function* () {
+        calls += 1;
+        await Promise.reject(new Error('OpenAI timeout'));
+        yield { id: 'unreachable', final: '' };
+      }),
+      { providerKey: 'openai:test-model' },
+    );
+    await session.translate();
+    await session.whenIdle();
+    expect(calls).toBe(1);
+    expect(document.querySelector('#cloud-failed')?.textContent).toBe('Hello world.');
+    expect(session.state().pending).toBe(0);
+  });
+
+  it('does not repeat a paid request to repair a broken placeholder', async () => {
+    document.documentElement.lang = 'en';
+    document.body.innerHTML = '<p>See <a href="/osaka">Osaka</a> today.</p>';
+    let calls = 0;
+    const session = start(
+      document,
+      engineOf(async function* (segments) {
+        calls += 1;
+        for (const segment of segments)
+          yield { id: segment.id, final: 'Osaka <i1 today', engine: 'openai' as const };
+      }),
+      { providerKey: 'openai:test-model' },
+    );
+    await session.translate();
+    await session.whenIdle();
+    expect(calls).toBe(1);
+    expect(document.body.innerHTML).not.toMatch(/<i\d/);
+  });
+});
