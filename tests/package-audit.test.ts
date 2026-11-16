@@ -16,6 +16,7 @@ function manifest(overrides: PackagedManifest = {}): PackagedManifest {
       'scripting',
       'contextMenus',
     ],
+    optional_permissions: ['identity'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     ...overrides,
   };
@@ -51,6 +52,34 @@ describe('auditPackage', () => {
       manifest({ host_permissions: ['https://*/*'] }),
     );
     expect(problems).toContain('host_permissions must stay empty');
+  });
+
+  it.each([[], ['tabs'], ['identity', 'tabs'], ['identity', 'identity']])(
+    'rejects optional permissions outside the exact identity whitelist: %j',
+    (...optionalPermissions) => {
+      const problems = auditPackage(
+        REQUIRED_ENTRIES,
+        manifest({ optional_permissions: optionalPermissions }),
+      );
+      expect(problems).toContain(`optional_permissions ${optionalPermissions.join(',')}`);
+    },
+  );
+
+  it('does not allow identity as an install-time permission', () => {
+    const current = manifest();
+    const permissions = [...current.permissions!, 'identity'];
+    expect(auditPackage(REQUIRED_ENTRIES, manifest({ permissions }))).toContain(
+      `permissions ${permissions.join(',')}`,
+    );
+  });
+
+  it('requires the isolated Copilot page', () => {
+    expect(
+      auditPackage(
+        REQUIRED_ENTRIES.filter((name) => name !== 'copilot.html'),
+        manifest(),
+      ),
+    ).toContain('missing copilot.html');
   });
 
   it('rejects packaged scripts that still point at jsDelivr', () => {

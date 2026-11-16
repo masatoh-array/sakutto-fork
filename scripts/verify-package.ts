@@ -19,6 +19,9 @@ export const REQUIRED_PERMISSIONS = [
   'unlimitedStorage',
 ] as const;
 
+// Copilot login requests identity at runtime; it must not become an install-time permission.
+export const REQUIRED_OPTIONAL_PERMISSIONS = ['identity'] as const;
+
 export const REQUIRED_HOST_PATTERNS = ['http://*/*', 'https://*/*'] as const;
 
 export const REQUIRED_ENTRIES = [
@@ -29,6 +32,7 @@ export const REQUIRED_ENTRIES = [
   'onboarding.html',
   'sample.html',
   'typed.html',
+  'copilot.html',
   'gpu-probe.js',
   'grant.html',
   'offscreen.html',
@@ -100,8 +104,9 @@ export function auditPackage(entries: readonly string[], manifest: PackagedManif
   if (!sameMembers(optionalHosts, REQUIRED_HOST_PATTERNS)) {
     problems.push(`optional_host_permissions ${optionalHosts.join(',')}`);
   }
-  if ((manifest.optional_permissions ?? []).length > 0) {
-    problems.push('optional_permissions must stay empty');
+  const optionalPermissions = manifest.optional_permissions ?? [];
+  if (!sameMembers(optionalPermissions, REQUIRED_OPTIONAL_PERMISSIONS)) {
+    problems.push(`optional_permissions ${optionalPermissions.join(',')}`);
   }
   return problems;
 }
