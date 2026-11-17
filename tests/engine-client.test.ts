@@ -118,12 +118,26 @@ describe('EngineClient OpenAI routing', () => {
     cloudMocks.localGet.mockResolvedValueOnce({
       settings: { schemaVersion: 1, translationProvider: 'openai', openaiModel: 'test-model' },
     });
+    for (let i = 0; i < 4; i++)
+      cloudMocks.localGet.mockResolvedValueOnce({
+        settings: { schemaVersion: 1, translationProvider: 'openai', openaiModel: 'test-model' },
+      });
     const fetchMock = vi.fn(
       async () =>
         new Response(
           JSON.stringify({
             status: 'completed',
-            output: [{ type: 'message', content: [{ type: 'output_text', text: '訳文' }] }],
+            output: [
+              {
+                type: 'message',
+                content: [
+                  {
+                    type: 'output_text',
+                    text: JSON.stringify({ translations: [{ id: '0', text: '訳文' }] }),
+                  },
+                ],
+              },
+            ],
           }),
         ),
     );
@@ -131,11 +145,27 @@ describe('EngineClient OpenAI routing', () => {
     const offscreen = controller();
     const client = new EngineClient(offscreen);
     const chunks: TranslationChunk[] = [];
-    for await (const chunk of client.translate([{ id: 'a', text: 'Hello' }], options()))
+    for await (const chunk of client.translate([{ id: 'a', text: 'Hello' }], {
+      ...options(),
+      cacheScope: 'https://a.example',
+    }))
       chunks.push(chunk);
     expect(chunks).toEqual([{ id: 'a', final: '訳文', engine: 'openai' }]);
+    for await (const chunk of client.translate([{ id: 'new-id', text: 'Hello' }], {
+      ...options(),
+      cacheScope: 'https://a.example',
+    })) {
+      expect(chunk).toEqual({ id: 'new-id', final: '訳文', engine: 'openai' });
+    }
     expect(offscreen.ensure).not.toHaveBeenCalled();
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    for await (const chunk of client.translate([{ id: 'b', text: 'Hello' }], {
+      ...options(),
+      cacheScope: 'https://b.example',
+    })) {
+      expect(chunk.id).toBe('b');
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(browser.storage.onChanged.removeListener).toHaveBeenCalled();
   });
   it('does not fall back to a local model when OpenAI permission is missing', async () => {

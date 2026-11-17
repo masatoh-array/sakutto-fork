@@ -19,10 +19,10 @@ function options(signal = new AbortController().signal): TranslateOptions {
   return { tgt: 'ja', form: 'polite', priority: 10, signal };
 }
 
-function connect(): FakePort {
+function connect(sender: Record<string, unknown> = {}): FakePort {
   const port = new FakePort({
     name: TRANSLATION_PORT,
-    sender: { id: 'test-extension' },
+    sender: { id: 'test-extension', ...sender },
   });
   const listener = vi.mocked(browser.runtime.onConnect.addListener).mock.calls.at(-1)?.[0];
   if (!listener) throw new Error('The broker did not register a connect listener.');
@@ -40,6 +40,30 @@ function start(port: FakePort, requestId = 'r1'): void {
 }
 
 describe('TranslationBroker', () => {
+  it('derives cache scope from the sender, not message options, and rejects opaque origins', async () => {
+    const translate = vi.fn(async function* (
+      _segments: unknown,
+      _options: TranslateOptions,
+    ): AsyncIterable<TranslationChunk> {
+      void _segments;
+      void _options;
+      yield { id: 'a', final: 'ok' };
+    });
+    new TranslationBroker({ translate } as unknown as EngineClient).start();
+    const port = connect({ origin: 'https://a.example', url: 'https://a.example/page' });
+    port.emit({
+      type: 'start',
+      requestId: 'scope',
+      segments: [{ id: 'a', text: 'Hello' }],
+      options: { ...serializeTranslateOptions(options()), cacheScope: 'https://victim.example' },
+    });
+    await flushTasks();
+    expect(translate.mock.calls[0]?.[1].cacheScope).toBe('https://a.example');
+    start(connect({ origin: 'null', url: 'https://a.example/page' }));
+    await flushTasks();
+    expect(translate.mock.calls[1]?.[1].cacheScope).toBeUndefined();
+  });
+
   it('streams chunks with their provenance and a done event', async () => {
     const translate = vi.fn(async function* (): AsyncIterable<TranslationChunk> {
       yield { id: 'a', final: '簡易訳', engine: 'chrome' };

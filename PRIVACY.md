@@ -1,6 +1,6 @@
 # Privacy policy
 
-## Personal BYOK fork addendum (2026-11-15)
+## Personal BYOK fork addendum (2026-11-17)
 
 This addendum applies to this personal fork. The upstream policy preserved below describes
 **local mode**, not the optional OpenAI or isolated Copilot modes. Enabling OpenAI sends translation text, surrounding
@@ -14,8 +14,15 @@ The API key is held in trusted-context-only browser session storage. It is not p
 settings or synchronized storage, or sent to page scripts. Restarting the browser or reloading the
 extension clears it. The settings page can delete the key; deletion does not revoke it at OpenAI
 and does not switch providers automatically. Switch back to local mode explicitly to stop future
-cloud translation requests. OpenAI mode bypasses the local translation cache. Do not use it for
-confidential pages without authorization. API charges are separate from ChatGPT subscription fees.
+cloud translation requests. OpenAI has a separate local IndexedDB translation cache, retaining up to
+500 successful calls' translated text across browser restarts. Cache keys are hashes of the origin,
+model, translation options, context and ordered input; raw source text and API keys are not stored
+in that cache. Translations themselves are stored as plaintext and may contain confidential content.
+Use the settings' translation-cache clearing action to delete both local and OpenAI caches; deleting
+the API key or switching providers does not clear translations. A session API key and connection
+permission are still required to use a cached OpenAI result. If IndexedDB is unavailable, the cache
+falls back to memory. Do not use OpenAI for confidential pages without authorization. API charges
+are separate from ChatGPT subscription fees.
 
 The experimental Copilot screen sends manually pasted text to Microsoft Graph after sign-in and
 explicit consent. It requires broad delegated permissions for work content. Enterprise grounding
@@ -97,7 +104,7 @@ Questions about this policy can be opened as an issue at https://github.com/jamm
 
 # プライバシーポリシー
 
-## 個人用 BYOK fork の追記（2026-11-15）
+## 個人用 BYOK fork の追記（2026-11-17）
 
 この追記は個人用 fork のものです。以下に残した本家のポリシーは**ローカル方式**に適用され、
 任意の OpenAI 方式や隔離されたCopilot画面には適用されません。OpenAI を有効化すると、翻訳対象の文字・周辺文脈・
@@ -110,8 +117,14 @@ OpenAI による取り扱いには同社の適用される規約・ポリシー�
 キーは信頼された拡張機能コンテキストだけが読めるセッションストレージに保存し、通常の設定・
 同期ストレージ・ページ側には渡しません。ブラウザ再起動・拡張機能再読み込みで消えます。
 設定からキーを削除できますが、OpenAI 側での失効やローカル方式への切替は別操作です。
-今後のクラウド翻訳を止めるには明示的にローカルへ戻してください。OpenAI 方式はローカル翻訳
-キャッシュを使いません。許可のない機密ページで使用しないでください。API 料金は ChatGPT の月額料金とは別です。
+今後のクラウド翻訳を止めるには明示的にローカルへ戻してください。OpenAI 方式は専用の端末内
+IndexedDB キャッシュに、成功した最大 500 呼び出し分の訳文を保存し、ブラウザ再起動後も保持します。
+キャッシュキーはオリジン・モデル・翻訳条件・文脈・入力順序のハッシュで、原文や API キーを
+そのキャッシュには保存しません。ただし訳文自体は平文で、機密情報を含み得ます。
+設定の翻訳キャッシュ消去でローカル用・OpenAI 用の両方を削除できます。API キーの削除や方式の
+切替だけでは訳文は消えません。キャッシュ再利用にもセッションの API キーと接続権限が必要です。
+IndexedDB が使えない場合はメモリ内に保持します。許可のない機密ページで使用しないでください。
+API 料金は ChatGPT の月額料金とは別です。
 
 Copilot実験版は、明示的な同意とサインイン後、手動で貼り付けた文章をMicrosoft Graphへ送ります。
 職場の情報に対する広い委任アクセス許可が必要です。組織内検索により組織情報を含む回答が返る可能性があるため、

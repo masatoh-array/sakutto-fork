@@ -70,6 +70,21 @@ export class TranslationBroker {
       void (async () => {
         try {
           const options = deserializeTranslateOptions(message.options, controller.signal);
+          // Use the browser-authenticated sender, never a scope claimed by page input.
+          const senderOrigin = port.sender?.origin;
+          try {
+            const url = new URL(senderOrigin ?? port.sender?.url ?? '');
+            if ((url.protocol === 'https:' || url.protocol === 'http:') && url.origin !== 'null') {
+              options.cacheScope = url.origin;
+            } else if (
+              !port.sender?.tab &&
+              (url.protocol === 'chrome-extension:' || url.protocol === 'moz-extension:')
+            ) {
+              options.cacheScope = `extension:${browser.runtime.id}`;
+            }
+          } catch {
+            /* Unknown or opaque origins do not use the persistent cloud cache. */
+          }
           for await (const chunk of this.client.translate(message.segments, options)) {
             post({ type: 'chunk', requestId, chunk });
           }

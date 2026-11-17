@@ -13,6 +13,8 @@ export interface TranslateSegment {
 }
 
 export interface TranslateOptions {
+  /** Background-only trusted caller origin. Never accepted from serialized page messages. */
+  cacheScope?: string | undefined;
   src?: string | undefined;
   tgt: string;
   form: Formality;

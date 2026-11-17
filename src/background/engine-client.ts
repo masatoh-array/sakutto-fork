@@ -30,6 +30,7 @@ import {
 } from '@/shared/engine-status';
 import type { TierPreference } from '@/shared/settings';
 import { loadSettings } from '@/shared/storage';
+import { OpenAITranslationCache } from '@/engine/openai/cache';
 import { OpenAIEngine } from '@/engine/openai/engine';
 import { OPENAI_ORIGIN, readOpenAIKey } from '@/engine/openai/credentials';
 import type { OffscreenController } from './offscreen-lifecycle';
@@ -92,6 +93,8 @@ export class EngineClient {
   private readonly progress = new Map<string, (status: ModelStatus) => void>();
   private readonly modelMarks = new Map<string, ModelStatus>();
 
+  private readonly openAICache = new OpenAITranslationCache();
+
   constructor(private readonly controller: OffscreenController) {}
 
   async status(): Promise<EngineStatus> {
@@ -133,7 +136,10 @@ export class EngineClient {
   }
 
   async clearCache(): Promise<void> {
-    await this.request({ type: 'cache-clear' }, { timeoutMs: 15_000 });
+    await Promise.all([
+      this.openAICache.clear(),
+      this.request({ type: 'cache-clear' }, { timeoutMs: 15_000 }),
+    ]);
   }
 
   async setTier(tier: TierPreference): Promise<void> {
@@ -234,9 +240,20 @@ export class EngineClient {
           current.openaiModel !== settings.openaiModel
         )
           return;
-        const engine = new OpenAIEngine(await readOpenAIKey(), settings.openaiModel);
+        const apiKey = await readOpenAIKey();
+        const engine = new OpenAIEngine(apiKey, settings.openaiModel);
         if (options.signal.aborted) cancel();
-        yield* engine.translate(segments, { ...options, signal: controller.signal });
+        // Require the same active session credential even when a cached result exists.
+        if (!apiKey) {
+          yield* engine.translate(segments, { ...options, signal: controller.signal });
+          return;
+        }
+        yield* this.openAICache.translate(
+          engine,
+          segments,
+          { ...options, signal: controller.signal },
+          settings.openaiModel,
+        );
       } finally {
         options.signal.removeEventListener('abort', cancel);
         browser.storage.onChanged.removeListener(changed);
