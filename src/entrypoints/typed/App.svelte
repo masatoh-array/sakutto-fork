@@ -2,7 +2,11 @@
   import { onMount } from 'svelte';
   import { browser } from 'wxt/browser';
   import { DEFAULT_MODEL_ID } from '@/engine/model/catalog';
-  import { isEngineError } from '@/engine/errors';
+  import {
+    isEngineError,
+    openAIErrorMessageKey,
+    type OpenAIErrorMessageKey,
+  } from '@/engine/errors';
   import type { EngineStatus } from '@/shared/engine-status';
   import { currentUiLanguage, t } from '@/shared/i18n';
   import {
@@ -39,6 +43,7 @@
   let result = $state('');
   let translating = $state(false);
   let resultError = $state(false);
+  let openAIFailure = $state<OpenAIErrorMessageKey | null>(null);
   let copied = $state(false);
   let copyFailed = $state(false);
   let downloadBusy = $state(false);
@@ -98,6 +103,7 @@
   function resetResult() {
     result = '';
     resultError = false;
+    openAIFailure = null;
     copied = false;
     copyFailed = false;
   }
@@ -118,6 +124,7 @@
     translating = true;
     resetResult();
     let text = '';
+    const isOpenAI = settings?.translationProvider === 'openai';
     try {
       const segments = [{ id: 'typed', text: trimmed }];
       for await (const chunk of typedEngine.translate(segments, {
@@ -135,11 +142,15 @@
           result = text;
         }
       }
-      if (text.trim().length === 0) resultError = true;
+      if (text.trim().length === 0 && !controller.signal.aborted) {
+        resultError = true;
+        if (isOpenAI) openAIFailure = 'openaiInvalidResponse';
+      }
     } catch (error) {
       if (!controller.signal.aborted) {
         resultError = true;
-        if (isEngineError(error)) await refreshEngine();
+        if (isOpenAI) openAIFailure = openAIErrorMessageKey(error);
+        else if (isEngineError(error)) await refreshEngine();
       }
     } finally {
       if (abortController === controller) {
@@ -338,7 +349,7 @@
         {:else if readiness === 'model-error'}
           <p class="error note" role="alert">{t('typedModelError')}</p>
         {:else if resultError}
-          <p class="error note" role="alert">{t('typedFailed')}</p>
+          <p class="error note" role="alert">{t(openAIFailure ?? 'typedFailed')}</p>
         {:else if result.trim().length > 0}
           <output class="result" lang={targetLanguage} aria-labelledby="typed-result-title"
             >{result}</output

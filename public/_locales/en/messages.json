@@ -748,6 +748,48 @@
   "typedRunHint": {
     "message": "Ctrl+Enter (⌘+Enter on a Mac) translates too."
   },
+  "openaiKeyMissing": {
+    "message": "OpenAI API: Set an API key in the extension settings."
+  },
+  "openaiPermission": {
+    "message": "OpenAI API: Allow the connection in the extension settings."
+  },
+  "openaiCredentialStore": {
+    "message": "OpenAI API: Could not access the key store. Check the extension settings."
+  },
+  "openaiAuth": {
+    "message": "OpenAI API: Authentication failed. Check your API key."
+  },
+  "openaiModelAccess": {
+    "message": "OpenAI API: Check the model name and your project’s access."
+  },
+  "openaiQuota": {
+    "message": "OpenAI API: Insufficient quota. Check API billing and usage limits."
+  },
+  "openaiRateLimit": {
+    "message": "OpenAI API: Rate limit reached. Wait briefly and try again."
+  },
+  "openaiTimeout": {
+    "message": "OpenAI API: The request timed out. Try again or select less text."
+  },
+  "openaiNetwork": {
+    "message": "OpenAI API: Could not reach OpenAI. Check your network."
+  },
+  "openaiInvalidResponse": {
+    "message": "OpenAI API: Did not receive a complete, usable translation."
+  },
+  "openaiService": {
+    "message": "OpenAI API: The service returned an error. Try again later."
+  },
+  "openaiRejected": {
+    "message": "OpenAI API: The request was rejected. Check your settings or try less text."
+  },
+  "openaiConnectionClosed": {
+    "message": "OpenAI API: The extension’s connection closed. Reload the page and try again."
+  },
+  "openaiFailed": {
+    "message": "OpenAI API: Translation could not be completed."
+  },
   "typedFailed": {
     "message": "The text could not be translated. Your text is unchanged; try again."
   },

@@ -1,4 +1,4 @@
-import { EngineError, isAbortError } from '../errors';
+import { EngineError, isAbortError, type EngineErrorCode } from '../errors';
 import type {
   IdentifiedEngine,
   TranslateOptions,
@@ -75,8 +75,8 @@ export class OpenAIEngine implements IdentifiedEngine {
   ): AsyncIterable<TranslationChunk> {
     if (!this.#apiKey.trim())
       throw new EngineError(
-        'invalid-input',
-        'OpenAI API key is missing. Enter it in extension settings after restarting the browser.',
+        'openai-key-missing',
+        'OpenAI API key is missing. Set it in extension settings.',
         { retryable: false },
       );
     if (options.signal.aborted) return;
@@ -202,13 +202,11 @@ export class OpenAIEngine implements IdentifiedEngine {
           },
         }),
       });
-      if (!response.ok)
-        throw new EngineError(
-          'unknown',
-          `OpenAI request failed (HTTP ${response.status}). Check the API key, billing, model access and rate limits in extension settings.`,
-          { retryable: false },
-        );
-      const data: unknown = await response.json();
+      if (!response.ok) throw await responseError(response);
+      const data: unknown = await response.json().catch((error: unknown) => {
+        if (isAbortError(error)) throw error;
+        throw invalidTranslation();
+      });
       if (options.signal.aborted) return [];
       if (controller.signal.aborted) throw new DOMException('Timed out', 'AbortError');
       const text = responseText(data);
@@ -223,10 +221,8 @@ export class OpenAIEngine implements IdentifiedEngine {
       if (options.signal.aborted) return [];
       if (error instanceof EngineError) throw error;
       throw new EngineError(
-        'unknown',
-        isAbortError(error)
-          ? 'OpenAI request timed out. Try a shorter selection.'
-          : 'OpenAI request failed. Check your connection and extension permissions.',
+        isAbortError(error) ? 'openai-timeout' : 'openai-network',
+        isAbortError(error) ? 'OpenAI request timed out.' : 'OpenAI network request failed.',
         { retryable: false },
       );
     } finally {
@@ -237,9 +233,32 @@ export class OpenAIEngine implements IdentifiedEngine {
   }
 }
 
+/** Only known statuses and the exact quota code influence diagnostics. */
+async function responseError(response: Response): Promise<EngineError> {
+  const { status } = response;
+  let code: EngineErrorCode = 'openai-rejected';
+  if (status === 401) code = 'openai-auth';
+  else if (status === 403 || status === 404) code = 'openai-model-access';
+  else if (status === 429) {
+    const data: unknown = await response.json().catch((error: unknown) => {
+      if (isAbortError(error)) throw error;
+      return null;
+    });
+    const body = typeof data === 'object' && data !== null && 'error' in data ? data.error : null;
+    code =
+      typeof body === 'object' &&
+      body !== null &&
+      'code' in body &&
+      body.code === 'insufficient_quota'
+        ? 'openai-quota'
+        : 'openai-rate-limit';
+  } else if (status >= 500) code = 'openai-service';
+  return new EngineError(code, `OpenAI request failed (HTTP ${status}).`, { retryable: false });
+}
+
 function invalidTranslation(): EngineError {
   return new EngineError(
-    'unknown',
+    'openai-invalid-response',
     'OpenAI returned an incomplete or invalid translation. No automatic retry was made.',
     { retryable: false },
   );

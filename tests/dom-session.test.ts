@@ -10,6 +10,7 @@ import {
   uiShadow,
 } from '@/dom/overlay';
 import { PageSession, type PageEngine, type SessionPreferences } from '@/dom/session';
+import { EngineError } from '@/engine/errors';
 import { JobScheduler } from '@/engine/queue/scheduler';
 import type { TranslateOptions } from '@/engine/types';
 
@@ -19,6 +20,7 @@ const labels = {
   machine: 'PLaMo による機械翻訳です。',
   selectionPending: '翻訳しています…',
   selectionFailed: 'この選択範囲を翻訳できませんでした。',
+  openAIError: (key: string) => `localized:${key}`,
   selectionTitle: '選択したテキスト',
   selectionIcon: '選択したテキストを翻訳します',
   close: '閉じる',
@@ -2707,7 +2709,7 @@ describe('coverage reporting does not over-report', () => {
 });
 
 describe('cloud translation retry policy', () => {
-  it('does not automatically retry a failed OpenAI page request', async () => {
+  it('shows only the safe OpenAI error in the page bar and does not retry', async () => {
     document.documentElement.lang = 'en';
     document.body.innerHTML = '<p id="cloud-failed">Hello world.</p>';
     let calls = 0;
@@ -2715,7 +2717,7 @@ describe('cloud translation retry policy', () => {
       document,
       engineOf(async function* () {
         calls += 1;
-        await Promise.reject(new Error('OpenAI timeout'));
+        await Promise.reject(new EngineError('openai-timeout', 'private API text'));
         yield { id: 'unreachable', final: '' };
       }),
       { providerKey: 'openai:test-model' },
@@ -2725,6 +2727,33 @@ describe('cloud translation retry policy', () => {
     expect(calls).toBe(1);
     expect(document.querySelector('#cloud-failed')?.textContent).toBe('Hello world.');
     expect(session.state().pending).toBe(0);
+    const text = uiShadow(document.querySelector('sakutto-bar'))?.textContent;
+    expect(text).toContain('localized:openaiTimeout');
+    expect(text).not.toContain('private API text');
+    session.restore();
+    expect(document.querySelector<HTMLElement>('sakutto-bar')?.hidden).toBe(true);
+  });
+
+  it('remembers a prefetch failure and shows its safe reason when the selection is opened', async () => {
+    let calls = 0;
+    const session = start(
+      document,
+      engineOf(async function* () {
+        calls += 1;
+        await Promise.reject(new EngineError('openai-key-missing', 'private API text'));
+        yield { id: 'unreachable', final: '' };
+      }),
+      { providerKey: 'openai:test-model' },
+    );
+    const rect = new DOMRect(16, 16, 30, 10);
+    session.translateSelection('Hello world.', rect, false);
+    await session.whenIdle();
+    session.translateSelection('Hello world.', rect);
+    await session.whenIdle();
+    const text = uiShadow(document.querySelector('sakutto-pop'))?.textContent;
+    expect(text).toContain('localized:openaiKeyMissing');
+    expect(text).not.toContain('private API text');
+    expect(calls).toBe(1);
   });
 
   it('does not repeat a paid request to repair a broken placeholder', async () => {

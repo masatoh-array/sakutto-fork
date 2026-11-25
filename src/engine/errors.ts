@@ -1,4 +1,20 @@
+const OPENAI_ERROR_MESSAGES = {
+  'openai-key-missing': 'openaiKeyMissing',
+  'openai-permission': 'openaiPermission',
+  'openai-credential-store': 'openaiCredentialStore',
+  'openai-auth': 'openaiAuth',
+  'openai-model-access': 'openaiModelAccess',
+  'openai-quota': 'openaiQuota',
+  'openai-rate-limit': 'openaiRateLimit',
+  'openai-timeout': 'openaiTimeout',
+  'openai-network': 'openaiNetwork',
+  'openai-invalid-response': 'openaiInvalidResponse',
+  'openai-service': 'openaiService',
+  'openai-rejected': 'openaiRejected',
+} as const;
+
 export type EngineErrorCode =
+  | keyof typeof OPENAI_ERROR_MESSAGES
   | 'invalid-input'
   | 'unsupported-language'
   | 'model-missing'
@@ -46,6 +62,7 @@ const ENGINE_ERROR_CODES: ReadonlySet<string> = new Set<EngineErrorCode>([
   'offscreen-unavailable',
   'aborted',
   'unknown',
+  ...(Object.keys(OPENAI_ERROR_MESSAGES) as (keyof typeof OPENAI_ERROR_MESSAGES)[]),
 ]);
 
 export function isEngineErrorCode(value: unknown): value is EngineErrorCode {
@@ -68,4 +85,18 @@ export function toEngineError(value: unknown): EngineError {
   if (isAbortError(value)) return abortError();
   const message = value instanceof Error ? value.message : String(value);
   return new EngineError('unknown', message, { cause: value });
+}
+
+/** Localized UI copy is derived from an allowlist, never the API's or a transport's text. */
+export type OpenAIErrorMessageKey =
+  | (typeof OPENAI_ERROR_MESSAGES)[keyof typeof OPENAI_ERROR_MESSAGES]
+  | 'openaiConnectionClosed'
+  | 'openaiFailed';
+
+export function openAIErrorMessageKey(value: unknown): OpenAIErrorMessageKey {
+  if (!isEngineError(value)) return 'openaiFailed';
+  if (value.code === 'offscreen-unavailable') return 'openaiConnectionClosed';
+  return Object.hasOwn(OPENAI_ERROR_MESSAGES, value.code)
+    ? OPENAI_ERROR_MESSAGES[value.code as keyof typeof OPENAI_ERROR_MESSAGES]
+    : 'openaiFailed';
 }

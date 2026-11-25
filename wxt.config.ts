@@ -29,7 +29,7 @@ export default defineConfig({
       'scripting',
       'contextMenus',
     ],
-    optional_permissions: ['identity'],
+    optional_permissions: ['identity', 'nativeMessaging'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     // Release builds ask for site access only when auto-translate is turned on.
     // The e2e build may script the local fixtures directly.

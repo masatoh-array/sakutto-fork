@@ -19,8 +19,8 @@ export const REQUIRED_PERMISSIONS = [
   'unlimitedStorage',
 ] as const;
 
-// Copilot login requests identity at runtime; it must not become an install-time permission.
-export const REQUIRED_OPTIONAL_PERMISSIONS = ['identity'] as const;
+// Copilot login and the Windows key vault request their permissions at runtime.
+export const REQUIRED_OPTIONAL_PERMISSIONS = ['identity', 'nativeMessaging'] as const;
 
 export const REQUIRED_HOST_PATTERNS = ['http://*/*', 'https://*/*'] as const;
 

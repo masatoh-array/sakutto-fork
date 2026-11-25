@@ -748,6 +748,48 @@
   "typedRunHint": {
     "message": "Ctrl+Enter（Mac は ⌘+Enter）でも翻訳できます。"
   },
+  "openaiKeyMissing": {
+    "message": "OpenAI API：拡張機能の設定でAPIキーを登録してください。"
+  },
+  "openaiPermission": {
+    "message": "OpenAI API：拡張機能の設定でOpenAIへの接続を許可してください。"
+  },
+  "openaiCredentialStore": {
+    "message": "OpenAI API：キーの保存先に接続できません。拡張機能の設定を確認してください。"
+  },
+  "openaiAuth": {
+    "message": "OpenAI API：認証に失敗しました。APIキーを確認してください。"
+  },
+  "openaiModelAccess": {
+    "message": "OpenAI API：モデル名とプロジェクトの利用権限を確認してください。"
+  },
+  "openaiQuota": {
+    "message": "OpenAI API：利用枠が不足しています。APIの請求設定と利用上限を確認してください。"
+  },
+  "openaiRateLimit": {
+    "message": "OpenAI API：リクエスト上限に達しました。少し待ってから再試行してください。"
+  },
+  "openaiTimeout": {
+    "message": "OpenAI API：応答が時間内に届きませんでした。再試行するか、翻訳する範囲を短くしてください。"
+  },
+  "openaiNetwork": {
+    "message": "OpenAI API：OpenAIに接続できませんでした。ネットワークを確認してください。"
+  },
+  "openaiInvalidResponse": {
+    "message": "OpenAI API：翻訳結果が不完全か、期待する形式ではありませんでした。"
+  },
+  "openaiService": {
+    "message": "OpenAI API：サービス側でエラーが発生しました。時間をおいて再試行してください。"
+  },
+  "openaiRejected": {
+    "message": "OpenAI API：リクエストが拒否されました。設定を確認するか、翻訳する範囲を短くしてください。"
+  },
+  "openaiConnectionClosed": {
+    "message": "OpenAI API：拡張機能との接続が中断されました。ページを再読み込みして再試行してください。"
+  },
+  "openaiFailed": {
+    "message": "OpenAI API：翻訳を完了できませんでした。"
+  },
   "typedFailed": {
     "message": "翻訳できませんでした。入力したテキストはそのままです。もう一度お試しください。"
   },

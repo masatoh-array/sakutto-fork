@@ -16,7 +16,7 @@ function manifest(overrides: PackagedManifest = {}): PackagedManifest {
       'scripting',
       'contextMenus',
     ],
-    optional_permissions: ['identity'],
+    optional_permissions: ['identity', 'nativeMessaging'],
     optional_host_permissions: ['https://*/*', 'http://*/*'],
     ...overrides,
   };
@@ -55,7 +55,7 @@ describe('auditPackage', () => {
   });
 
   it.each([[], ['tabs'], ['identity', 'tabs'], ['identity', 'identity']])(
-    'rejects optional permissions outside the exact identity whitelist: %j',
+    'rejects optional permissions outside the exact optional permission whitelist: %j',
     (...optionalPermissions) => {
       const problems = auditPackage(
         REQUIRED_ENTRIES,

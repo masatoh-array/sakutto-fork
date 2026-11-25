@@ -1,3 +1,4 @@
+import type { OpenAIErrorMessageKey } from '@/engine/errors';
 import type { EngineKind } from '@/engine/types';
 
 export interface OverlayLabels {
@@ -6,6 +7,7 @@ export interface OverlayLabels {
   machine: string;
   selectionPending: string;
   selectionFailed: string;
+  openAIError?: (key: OpenAIErrorMessageKey) => string;
   selectionTitle: string;
   selectionIcon: string;
   close: string;

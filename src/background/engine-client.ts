@@ -1,5 +1,5 @@
 import { browser, type Browser } from 'wxt/browser';
-import { abortError, EngineError, isAbortError } from '@/engine/errors';
+import { abortError, EngineError, isAbortError, openAIErrorMessageKey } from '@/engine/errors';
 import type { ModelId } from '@/engine/model/catalog';
 import {
   ENGINE_HOST_PORT,
@@ -32,7 +32,12 @@ import type { TierPreference } from '@/shared/settings';
 import { loadSettings } from '@/shared/storage';
 import { OpenAITranslationCache } from '@/engine/openai/cache';
 import { OpenAIEngine } from '@/engine/openai/engine';
-import { OPENAI_ORIGIN, readOpenAIKey } from '@/engine/openai/credentials';
+import {
+  OPENAI_ORIGIN,
+  OPENAI_VAULT_REF,
+  readOpenAIKey,
+  readOpenAIVaultRef,
+} from '@/engine/openai/credentials';
 import type { OffscreenController } from './offscreen-lifecycle';
 
 type RequestWithoutId =
@@ -208,15 +213,18 @@ export class EngineClient {
     if (options.signal.aborted || segments.length === 0) return;
     const settings = await loadSettings();
     if (settings.translationProvider === 'openai') {
-      if (!(await browser.permissions.contains({ origins: [OPENAI_ORIGIN] }))) {
-        throw new EngineError('invalid-input', 'Enable OpenAI access in extension settings.', {
+      const allowed = await browser.permissions
+        .contains({ origins: [OPENAI_ORIGIN] })
+        .catch(() => false);
+      if (!allowed) {
+        throw new EngineError('openai-permission', 'Enable OpenAI access in extension settings.', {
           retryable: false,
         });
       }
       const controller = new AbortController();
       const cancel = () => controller.abort();
       const changed = (changes: Record<string, { newValue?: unknown }>, area: string) => {
-        if (area === 'session' && changes.openaiApiKey) cancel();
+        if (area === 'local' && changes[OPENAI_VAULT_REF]) cancel();
         if (area === 'local' && changes.settings) {
           const next = changes.settings.newValue;
           if (
@@ -240,20 +248,30 @@ export class EngineClient {
           current.openaiModel !== settings.openaiModel
         )
           return;
-        const apiKey = await readOpenAIKey();
+        const ref = await readOpenAIVaultRef();
+        const apiKey = ref ? await readOpenAIKey(ref) : '';
+        if (controller.signal.aborted || options.signal.aborted) return;
+        if (!apiKey)
+          throw new EngineError('openai-key-missing', 'OpenAI API key is missing.', {
+            retryable: false,
+          });
         const engine = new OpenAIEngine(apiKey, settings.openaiModel);
         if (options.signal.aborted) cancel();
-        // Require the same active session credential even when a cached result exists.
-        if (!apiKey) {
-          yield* engine.translate(segments, { ...options, signal: controller.signal });
-          return;
-        }
+        // Require an available credential even when a cached result exists.
         yield* this.openAICache.translate(
           engine,
           segments,
           { ...options, signal: controller.signal },
           settings.openaiModel,
         );
+      } catch (error) {
+        if (controller.signal.aborted || options.signal.aborted) return;
+        if (error instanceof EngineError && openAIErrorMessageKey(error) !== 'openaiFailed')
+          throw error;
+        // Never serialize an unexpected vault, browser, or cache exception to a page caller.
+        throw new EngineError('openai-rejected', 'OpenAI translation failed.', {
+          retryable: false,
+        });
       } finally {
         options.signal.removeEventListener('abort', cancel);
         browser.storage.onChanged.removeListener(changed);

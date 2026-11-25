@@ -6,6 +6,12 @@ import {
   parseBatchTranslations,
   responseText,
 } from '@/engine/openai/engine';
+import { openAIErrorMessageKey } from '@/engine/errors';
+import {
+  errorFromPayload,
+  errorPayload,
+  isTranslationServerMessage,
+} from '@/engine/offscreen/protocol';
 import type { TranslateOptions, TranslationChunk } from '@/engine/types';
 
 const options = (): TranslateOptions => ({
@@ -78,21 +84,56 @@ describe('OpenAI translation', () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
     await expect(collect(new OpenAIEngine('', 'test-model'))).rejects.toMatchObject({
-      code: 'invalid-input',
+      code: 'openai-key-missing',
       retryable: false,
     });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it.each([401, 429, 500])('sanitizes HTTP %s errors and does not retry', async (status) => {
-    const fetchMock = vi.fn(
-      async () => new Response('private text and key must not escape', { status }),
-    );
+  it.each([
+    [401, '', 'openai-auth', 'openaiAuth'],
+    [403, '', 'openai-model-access', 'openaiModelAccess'],
+    [404, '', 'openai-model-access', 'openaiModelAccess'],
+    [429, 'rate_limit_exceeded', 'openai-rate-limit', 'openaiRateLimit'],
+    [429, 'insufficient_quota', 'openai-quota', 'openaiQuota'],
+    [500, '', 'openai-service', 'openaiService'],
+    [400, '', 'openai-rejected', 'openaiRejected'],
+  ])(
+    'sanitizes HTTP %s errors through the translation protocol without retry',
+    async (status, apiCode, code, uiKey) => {
+      const fetchMock = vi.fn(
+        async () =>
+          new Response(
+            JSON.stringify({ error: { code: apiCode, message: 'private API error text' } }),
+            { status },
+          ),
+      );
+      vi.stubGlobal('fetch', fetchMock);
+      const error = await collect(new OpenAIEngine('test-key-not-real', 'test-model')).catch(
+        (failure: unknown) => failure,
+      );
+      expect(error).toMatchObject({ code, retryable: false });
+      const payload = errorPayload(error);
+      expect(payload).toMatchObject({ code, message: `OpenAI request failed (HTTP ${status}).` });
+      expect(JSON.stringify(payload)).not.toContain('private API error text');
+      expect(isTranslationServerMessage({ type: 'error', requestId: 'test', error: payload })).toBe(
+        true,
+      );
+      expect(openAIErrorMessageKey(errorFromPayload(payload))).toBe(uiKey);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it.each([
+    [() => Promise.reject(new TypeError('private network error')), 'openai-network'],
+    [() => Promise.resolve(new Response('private malformed response')), 'openai-invalid-response'],
+  ])('assigns safe diagnoses for network and parse failures', async (fetchMock, code) => {
     vi.stubGlobal('fetch', fetchMock);
-    await expect(collect(new OpenAIEngine('test-key-not-real', 'test-model'))).rejects.toThrow(
-      `HTTP ${status}`,
+    const error = await collect(new OpenAIEngine('test-key-not-real', 'test-model')).catch(
+      (failure: unknown) => failure,
     );
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(error).toMatchObject({ code, retryable: false });
+    expect(JSON.stringify(errorPayload(error))).not.toContain('private');
   });
 
   it('rejects incomplete, refusal and empty output', () => {
@@ -153,7 +194,7 @@ describe('OpenAI translation', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
     const pending = collect(new OpenAIEngine('test-key-not-real', 'test-model'));
-    const assertion = expect(pending).rejects.toThrow('timed out');
+    const assertion = expect(pending).rejects.toMatchObject({ code: 'openai-timeout' });
     await vi.advanceTimersByTimeAsync(25_000);
     await assertion;
     expect(fetchMock).toHaveBeenCalledTimes(1);

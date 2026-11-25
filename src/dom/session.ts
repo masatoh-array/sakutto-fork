@@ -1,3 +1,4 @@
+import { openAIErrorMessageKey, type OpenAIErrorMessageKey } from '@/engine/errors';
 import { estimateTokens } from '@/engine/text/tokens';
 import {
   coveredBlocks,
@@ -150,6 +151,7 @@ interface Live {
   partFinal: boolean[];
   rect: DOMRect | null;
   batchToken: number;
+  openAIFailure?: OpenAIErrorMessageKey;
 }
 
 interface InflightBatch {
@@ -690,13 +692,7 @@ export class PageSession {
       item.state === 'done' ? item.translation : partialText(item, this.prefs.targetLanguage);
     const text = stripPlaceholderTokens(ready);
     if (item.state === 'done' && text.trim().length === 0) {
-      this.overlay.showSelection(
-        item.rect,
-        this.labels.selectionFailed,
-        null,
-        false,
-        this.prefs.targetLanguage,
-      );
+      this.showSelectionFailure(item);
       return;
     }
     const pending = text.trim().length === 0;
@@ -1119,7 +1115,12 @@ export class PageSession {
       ? AbortSignal.any([this.pageController.signal, controller.signal])
       : controller.signal;
     const token = ++this.nextBatchToken;
-    for (const item of batch) item.batchToken = token;
+    for (const item of batch) {
+      item.batchToken = token;
+      delete item.openAIFailure;
+    }
+    const isOpenAI = this.prefs.providerKey?.startsWith('openai:') === true;
+    let failure: OpenAIErrorMessageKey | undefined;
     const requests: { id: string; text: string }[] = [];
     const owners = new Map<string, Live>();
 
@@ -1183,8 +1184,9 @@ export class PageSession {
           else this.queuePaint(item);
         }
       }
-    } catch {
-      // Unfinished blocks are retried below. Abort keeps the previous text.
+    } catch (error) {
+      // Unfinished local blocks are retried below. Abort keeps the previous text.
+      if (isOpenAI && !signal.aborted) failure = openAIErrorMessageKey(error);
     } finally {
       this.work.engineMs += Math.round(performance.now() - engineStarted);
       // The last `complete()` of this batch already ran inside the loop above, before this
@@ -1219,8 +1221,10 @@ export class PageSession {
           this.enqueue(item, true);
           continue;
         }
+        if (failure) item.openAIFailure = failure;
         if (item.role === 'selection') {
-          item.state = item.translation.length > 0 ? 'done' : 'idle';
+          // Keep a prefetched OpenAI failure for the popover rather than paying to retry on reveal.
+          item.state = failure || item.translation.length > 0 ? 'done' : 'idle';
           item.model?.block.removeAttribute('data-sakutto-pending');
           this.showSelectionFailure(item, signal);
           continue;
@@ -1265,16 +1269,17 @@ export class PageSession {
     this.complete(item);
   }
 
-  private showSelectionFailure(item: Live, signal: AbortSignal): void {
-    if (signal.aborted || item.role !== 'selection' || item !== this.selection || !item.rect)
+  private showSelectionFailure(item: Live, signal?: AbortSignal): void {
+    if (signal?.aborted || item.role !== 'selection' || item !== this.selection || !item.rect)
       return;
     if (!this.selectionShown || item.translation.trim().length > 0) return;
     this.overlay.showSelection(
       item.rect,
-      this.labels.selectionFailed,
-      null,
+      (item.openAIFailure && this.labels.openAIError?.(item.openAIFailure)) ||
+        this.labels.selectionFailed,
+      item.openAIFailure ? 'openai' : null,
       false,
-      this.prefs.targetLanguage,
+      item.openAIFailure ? undefined : this.prefs.targetLanguage,
     );
   }
 
@@ -1475,6 +1480,7 @@ export class PageSession {
       item.flatten = false;
       item.attempts = 0;
       item.failures = 0;
+      delete item.openAIFailure;
       item.partText = [];
       item.partFinal = [];
       item.state = 'idle';
@@ -1668,6 +1674,13 @@ export class PageSession {
   }
 
   private barText(view: PageViewState): string {
+    if (this.labels.openAIError && this.prefs.providerKey?.startsWith('openai:')) {
+      for (const item of this.live.values()) {
+        if (item.role === 'page' && item.openAIFailure) {
+          return this.labels.openAIError(item.openAIFailure);
+        }
+      }
+    }
     const base =
       view.pending > 0
         ? this.labels.barProgress(view.done, view.total)

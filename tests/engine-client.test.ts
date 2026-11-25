@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { browser } from 'wxt/browser';
+import { OPENAI_VAULT_REF } from '@/engine/openai/credentials';
 import { EngineClient } from '@/background/engine-client';
 import type { OffscreenController } from '@/background/offscreen-lifecycle';
 import type { TranslateOptions, TranslationChunk } from '@/engine/types';
@@ -12,12 +13,22 @@ const cloudMocks = vi.hoisted(() => ({
 
 vi.mock('wxt/browser', () => ({
   browser: {
-    runtime: { id: 'test-extension', connect: vi.fn() },
+    runtime: {
+      id: 'test-extension',
+      connect: vi.fn(),
+      sendNativeMessage: vi.fn(async () => ({ ok: true, key: 'test-key-not-real' })),
+    },
     storage: {
-      local: { get: cloudMocks.localGet },
-      session: {
-        get: vi.fn(async () => ({ openaiApiKey: 'test-key-not-real' })),
-        setAccessLevel: vi.fn(async () => undefined),
+      local: {
+        get: (key: string) =>
+          key === 'openaiVaultRef'
+            ? Promise.resolve({
+                openaiVaultRef: {
+                  slot: '65844646-b8e6-4e88-9d01-b485c1046d86',
+                  revision: '60c4646a-a895-4873-a564-9450618b6e18',
+                },
+              })
+            : cloudMocks.localGet(),
       },
       onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
     },
@@ -229,7 +240,7 @@ describe('OpenAI authorization changes', () => {
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const listener = vi.mocked(browser.storage.onChanged.addListener).mock.calls.at(-1)![0];
       if (change === 'key removal')
-        listener({ openaiApiKey: { oldValue: 'test-key-not-real' } }, 'session');
+        listener({ [OPENAI_VAULT_REF]: { newValue: 'changed' } }, 'local');
       else listener({ settings: { newValue: { translationProvider: 'local' } } }, 'local');
       expect(await pending).toEqual({ done: true, value: undefined });
       expect(fetchMock).toHaveBeenCalledTimes(1);

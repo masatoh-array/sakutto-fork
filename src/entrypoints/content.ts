@@ -52,6 +52,7 @@ function overlayLabels(): OverlayLabels {
     machine: t('machineTranslationTooltip'),
     selectionPending: t('selectionPending'),
     selectionFailed: t('selectionFailed'),
+    openAIError: (key) => t(key),
     selectionTitle: t('selectionTitle'),
     selectionIcon: t('selectionIcon'),
     close: t('close'),

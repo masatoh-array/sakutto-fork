@@ -7,7 +7,7 @@
   let { settings, onChange }: { settings: Settings; onChange: (patch: SettingsPatch) => void } =
     $props();
   let key = $state('');
-  let present = $state(false);
+  let present = $state<boolean | null>(null);
   let model = $state(untrack(() => settings.openaiModel));
   let busy = $state(false);
   let message = $state('');
@@ -17,7 +17,8 @@
         present = value;
       })
       .catch(() => {
-        message = 'キーの状態を確認できません。';
+        message =
+          'キーの状態を確認できません。Windows補助プログラムとChromeの権限を確認してください。';
       });
   });
 
@@ -28,8 +29,12 @@
   async function enable() {
     if (busy) return;
     message = '';
-    if (!key.trim() && !present) {
+    if (!key.trim() && present === false) {
       message = 'OpenAI APIキーを入力してください。';
+      return;
+    }
+    if (key.trim() && !/^[!-~]{1,1024}$/.test(key.trim())) {
+      message = 'APIキーの形式を確認してください。';
       return;
     }
     if (!/^[a-zA-Z0-9._:-]{1,100}$/.test(model.trim())) {
@@ -39,32 +44,44 @@
     busy = true;
     try {
       // Must stay in the click handler: this is an explicit optional host permission.
-      const allowed = await browser.permissions.request({ origins: [OPENAI_ORIGIN] });
+      const allowed = await browser.permissions.request({
+        origins: [OPENAI_ORIGIN],
+        permissions: ['nativeMessaging'],
+      });
       if (!allowed) {
-        message = 'OpenAIへの接続は許可されませんでした。';
+        message = 'OpenAIへの接続またはWindows補助プログラムの利用が許可されませんでした。';
         return;
       }
-      if (key.trim()) await saveOpenAIKey(key);
-      key = '';
-      present = await hasOpenAIKey();
+      if (key.trim()) {
+        await saveOpenAIKey(key);
+        key = '';
+        present = true;
+      } else if (!(await hasOpenAIKey())) {
+        present = false;
+        message = 'OpenAI APIキーを入力してください。';
+        return;
+      }
       onChange({ translationProvider: 'openai', openaiModel: model.trim() });
-      message = 'キーをこのブラウザセッションに保存しました。';
+      message = 'OpenAIを有効化しました。キーは再起動後もこのWindowsユーザーで使えます。';
     } catch {
-      message = '設定できませんでした。もう一度お試しください。';
+      message = 'キーを保存できません。Windows補助プログラムとChromeの権限を確認してください。';
     } finally {
-      key = '';
       busy = false;
     }
   }
 
   async function clear() {
+    if (busy) return;
+    busy = true;
     try {
       await saveOpenAIKey('');
       key = '';
       present = false;
       message = 'キーを削除しました。OpenAIの翻訳は停止し、ローカルへ自動切替はしません。';
     } catch {
-      message = 'キーを削除できませんでした。';
+      message = 'キーを削除できません。Windows補助プログラムとChromeの権限を確認してください。';
+    } finally {
+      busy = false;
     }
   }
 </script>
@@ -87,7 +104,7 @@
       有効化すると、翻訳対象の文章・周辺文脈・用語集をOpenAIへ送信します。自動翻訳を設定済みのサイトにも適用され、API利用料が発生します。ChatGPTの月額料金とは別です。機密情報を含むページでは使用しないでください。
     </p>
     <label
-      >APIキー {present ? '（セッション内に保存済み）' : '（未設定）'}
+      >APIキー {present === null ? '（状態未確認）' : present ? '（保存済み）' : '（未設定）'}
       <input
         type="password"
         bind:value={key}
@@ -98,12 +115,12 @@
     </label>
     <label>モデルID<input bind:value={model} autocomplete="off" spellcheck="false" /></label>
     <p>
-      キーはこのブラウザセッションのみ保存します。再起動・拡張機能の再読み込み後は再入力してください。端末間同期やページへのキー送信は行いません。
+      Windows版Chromeでは、初回のみ補助プログラムのセットアップが必要です。キーはWindowsユーザーに紐づけて暗号化され、再起動後も使えます。端末間同期やページへのキー送信は行いません。
     </p>
     <button type="button" disabled={busy} onclick={enable}
       >送信・課金を理解してOpenAIを有効化</button
     >
-    <button type="button" disabled={busy || !present} onclick={clear}>キーを削除</button>
+    <button type="button" disabled={busy || present === false} onclick={clear}>キーを削除</button>
   </details>
   <details>
     <summary>Microsoft 365 Copilot（実験版・別画面）</summary>
