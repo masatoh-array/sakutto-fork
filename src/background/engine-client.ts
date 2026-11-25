@@ -35,8 +35,8 @@ import { OpenAIEngine } from '@/engine/openai/engine';
 import {
   OPENAI_ORIGIN,
   OPENAI_VAULT_REF,
-  readOpenAIKey,
-  readOpenAIVaultRef,
+  readOpenAIKeyForTranslation,
+  removesOpenAIAccess,
 } from '@/engine/openai/credentials';
 import type { OffscreenController } from './offscreen-lifecycle';
 
@@ -213,16 +213,11 @@ export class EngineClient {
     if (options.signal.aborted || segments.length === 0) return;
     const settings = await loadSettings();
     if (settings.translationProvider === 'openai') {
-      const allowed = await browser.permissions
-        .contains({ origins: [OPENAI_ORIGIN] })
-        .catch(() => false);
-      if (!allowed) {
-        throw new EngineError('openai-permission', 'Enable OpenAI access in extension settings.', {
-          retryable: false,
-        });
-      }
       const controller = new AbortController();
       const cancel = () => controller.abort();
+      const permissionRemoved = (removed: { permissions?: string[]; origins?: string[] }) => {
+        if (removesOpenAIAccess(removed)) cancel();
+      };
       const changed = (changes: Record<string, { newValue?: unknown }>, area: string) => {
         if (area === 'local' && changes[OPENAI_VAULT_REF]) cancel();
         if (area === 'local' && changes.settings) {
@@ -240,16 +235,29 @@ export class EngineClient {
       };
       options.signal.addEventListener('abort', cancel, { once: true });
       browser.storage.onChanged.addListener(changed);
+      browser.permissions.onRemoved.addListener(permissionRemoved);
       try {
+        const allowed = await browser.permissions
+          .contains({ origins: [OPENAI_ORIGIN], permissions: ['nativeMessaging'] })
+          .catch(() => false);
+        if (!allowed)
+          throw new EngineError(
+            'openai-permission',
+            'Enable OpenAI access in extension settings.',
+            {
+              retryable: false,
+            },
+          );
         // Recheck after subscribing: a provider change during the permission await must not send.
         const current = await loadSettings();
         if (
+          controller.signal.aborted ||
+          options.signal.aborted ||
           current.translationProvider !== 'openai' ||
           current.openaiModel !== settings.openaiModel
         )
           return;
-        const ref = await readOpenAIVaultRef();
-        const apiKey = ref ? await readOpenAIKey(ref) : '';
+        const apiKey = await readOpenAIKeyForTranslation(controller.signal);
         if (controller.signal.aborted || options.signal.aborted) return;
         if (!apiKey)
           throw new EngineError('openai-key-missing', 'OpenAI API key is missing.', {
@@ -274,6 +282,7 @@ export class EngineClient {
         });
       } finally {
         options.signal.removeEventListener('abort', cancel);
+        browser.permissions.onRemoved.removeListener(permissionRemoved);
         browser.storage.onChanged.removeListener(changed);
       }
       return;

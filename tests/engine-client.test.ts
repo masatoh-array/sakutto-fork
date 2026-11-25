@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { browser } from 'wxt/browser';
 import { OPENAI_VAULT_REF } from '@/engine/openai/credentials';
 import { EngineClient } from '@/background/engine-client';
@@ -9,6 +9,7 @@ import { FakePort, flushTasks } from './support/ports';
 const cloudMocks = vi.hoisted(() => ({
   localGet: vi.fn<() => Promise<Record<string, unknown>>>(async () => ({})),
   contains: vi.fn(async () => true),
+  session: {} as Record<string, unknown>,
 }));
 
 vi.mock('wxt/browser', () => ({
@@ -30,12 +31,26 @@ vi.mock('wxt/browser', () => ({
               })
             : cloudMocks.localGet(),
       },
+      session: {
+        setAccessLevel: vi.fn(async () => undefined),
+        get: vi.fn(async () => cloudMocks.session),
+        set: vi.fn(async (values) => Object.assign(cloudMocks.session, values)),
+      },
       onChanged: { addListener: vi.fn(), removeListener: vi.fn() },
     },
-    permissions: { contains: cloudMocks.contains },
+    permissions: {
+      contains: cloudMocks.contains,
+      onRemoved: { addListener: vi.fn(), removeListener: vi.fn() },
+    },
     i18n: { getUILanguage: () => 'en' },
   },
 }));
+
+beforeEach(() => {
+  cloudMocks.session = {};
+  vi.mocked(browser.runtime.sendNativeMessage).mockClear();
+  vi.stubGlobal('navigator', { locks: { request: (_name: string, fn: () => unknown) => fn() } });
+});
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -177,6 +192,7 @@ describe('EngineClient OpenAI routing', () => {
       expect(chunk.id).toBe('b');
     }
     expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(browser.runtime.sendNativeMessage).toHaveBeenCalledTimes(1);
     expect(browser.storage.onChanged.removeListener).toHaveBeenCalled();
   });
   it('does not fall back to a local model when OpenAI permission is missing', async () => {
@@ -216,7 +232,7 @@ describe('OpenAI authorization changes', () => {
     expect(offscreen.ensure).not.toHaveBeenCalled();
   });
 
-  it.each(['key removal', 'provider change'])(
+  it.each(['key removal', 'provider change', 'permission removal'])(
     'aborts pending cloud translation on %s',
     async (change) => {
       for (let i = 0; i < 2; i += 1)
@@ -241,6 +257,10 @@ describe('OpenAI authorization changes', () => {
       const listener = vi.mocked(browser.storage.onChanged.addListener).mock.calls.at(-1)![0];
       if (change === 'key removal')
         listener({ [OPENAI_VAULT_REF]: { newValue: 'changed' } }, 'local');
+      else if (change === 'permission removal')
+        vi.mocked(browser.permissions.onRemoved.addListener).mock.calls.at(-1)![0]({
+          permissions: ['nativeMessaging'],
+        });
       else listener({ settings: { newValue: { translationProvider: 'local' } } }, 'local');
       expect(await pending).toEqual({ done: true, value: undefined });
       expect(fetchMock).toHaveBeenCalledTimes(1);

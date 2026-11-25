@@ -8,6 +8,7 @@ import { measureQuality } from '@/background/quality';
 import { TranslationBroker } from '@/background/translation-broker';
 import { grantOriginsFor } from '@/dom/sites';
 import { DEFAULT_MODEL_ID, getModel, type ModelId } from '@/engine/model/catalog';
+import { clearOpenAIKeySession, removesOpenAIAccess } from '@/engine/openai/credentials';
 import { hasLicenseConsent } from '@/shared/agreement';
 import type { EngineCapabilities } from '@/shared/capabilities';
 import { isEngineCapabilities } from '@/shared/capabilities';
@@ -62,6 +63,10 @@ export default defineBackground(() => {
   const downloads = new Map<ModelId, AbortController>();
   let capabilitiesCache: EngineCapabilities | null = null;
 
+  // Register synchronously so this wakes the service worker even between translations.
+  browser.permissions.onRemoved.addListener((removed) => {
+    if (removesOpenAIAccess(removed)) void clearOpenAIKeySession().catch(() => undefined);
+  });
   broker.start();
   installPageActions(broker);
 

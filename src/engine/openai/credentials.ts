@@ -4,6 +4,7 @@ import { EngineError } from '../errors';
 export const OPENAI_ORIGIN = 'https://api.openai.com/*';
 export const OPENAI_NATIVE_HOST = 'com.sakutto.openai_vault';
 // This sentinel is only an opaque vault slot plus a change marker, never a credential.
+const SESSION_KEY = 'openaiVaultSession';
 export const OPENAI_VAULT_REF = 'openaiVaultRef';
 type VaultRef = { slot: string; revision: string };
 type VaultOperation = 'has' | 'read' | 'save' | 'remove';
@@ -81,19 +82,84 @@ export async function readOpenAIKey(ref: VaultRef): Promise<string> {
   return response.key;
 }
 
+// Serialize cache population and credential edits across the service worker and options tabs.
+async function withVaultLock<T>(action: () => Promise<T>): Promise<T> {
+  try {
+    return await navigator.locks.request(OPENAI_VAULT_REF, action);
+  } catch {
+    throw vaultError();
+  }
+}
+
+async function trustedSession(): Promise<typeof browser.storage.session> {
+  const session = browser.storage.session;
+  // Never read or write a key if the browser cannot restrict access to extension contexts.
+  await session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' });
+  return session;
+}
+
+export function removesOpenAIAccess(removed: {
+  permissions?: string[];
+  origins?: string[];
+}): boolean {
+  // Wildcard host grants can authorize the API as well.
+  return (
+    removed.permissions?.includes('nativeMessaging') === true ||
+    removed.origins?.some(
+      (pattern) =>
+        pattern === '<all_urls>' ||
+        /^(?:https|\*):\/\/(?:\*\.)?(?:api\.openai\.com|openai\.com|\*)\//.test(pattern),
+    ) === true
+  );
+}
+
+export function clearOpenAIKeySession(): Promise<void> {
+  return withVaultLock(async () => {
+    await (await trustedSession()).remove(SESSION_KEY);
+  });
+}
+
+export async function readOpenAIKeyForTranslation(signal: AbortSignal): Promise<string> {
+  return withVaultLock(async () => {
+    if (signal.aborted) return '';
+    const ref = await readOpenAIVaultRef();
+    if (!ref || signal.aborted) return '';
+    const session = await trustedSession();
+    const cached: unknown = (await session.get(SESSION_KEY))[SESSION_KEY];
+    if (signal.aborted) return '';
+    if (
+      cached !== null &&
+      typeof cached === 'object' &&
+      'slot' in cached &&
+      cached.slot === ref.slot &&
+      'revision' in cached &&
+      cached.revision === ref.revision &&
+      'key' in cached &&
+      typeof cached.key === 'string' &&
+      validKey(cached.key)
+    )
+      return cached.key;
+
+    const key = await readOpenAIKey(ref);
+    if (signal.aborted) return '';
+    if (key) await session.set({ [SESSION_KEY]: { ...ref, key } });
+    return key;
+  });
+}
+
 export async function saveOpenAIKey(input: string): Promise<void> {
   const key = input.trim();
   if (key && !validKey(key)) throw new Error('Invalid API key format.');
-  // Options tabs share the extension origin. Serialize changes so they cannot allocate two slots.
-  await navigator.locks.request(OPENAI_VAULT_REF, async () => {
+  await withVaultLock(async () => {
     const ref = await readOpenAIVaultRef();
     if (!key && !ref) return;
     const slot = ref?.slot ?? crypto.randomUUID();
     const revision = crypto.randomUUID();
-    if (!ref) await browser.storage.local.set({ [OPENAI_VAULT_REF]: { slot, revision } });
+    // Notify active translations before changing the native vault. Waiting readers cannot
+    // use this revision until the write finishes and releases the lock.
+    await browser.storage.local.set({ [OPENAI_VAULT_REF]: { slot, revision } });
+    await (await trustedSession()).remove(SESSION_KEY);
     await callVault(key ? 'save' : 'remove', slot, key || undefined);
-    // Keep the non-secret slot after deleting the key to make later saves predictable.
-    if (ref) await browser.storage.local.set({ [OPENAI_VAULT_REF]: { slot, revision } });
   });
 }
 
